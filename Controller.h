@@ -5,26 +5,16 @@
 /***************************************************************************BEGIN CODE****************************************************************/
 class Controller {
 public:
-    Controller(Pixy2 *const pixy, const int PIN_PING, DualMAX14870MotorShield *const motors, Adafruit_BNO055 *const bno)
-    : pixy(pixy), motors(motors), PIN_PING(PIN_PING), bno(bno), rollOffset(400), integral(0), previous_error(0), lastTime(0) {
-        kp_turn = 2.0;
-        ki_turn = 0.1;
-        kd_turn = 0.05;
-        kp_forward = 0.4;
-        ki_forward = 0.1;
-        kd_forward = 0.01;
-        SPEED_OF_SOUND = 0.0343;  
-    }
+    Controller(Pixy2 *pixy, int pinPing, DualMAX14870MotorShield *motors, Adafruit_BNO055 *bno)
+    : pixy(pixy), motors(motors), PIN_PING(pinPing), bno(bno), rollOffset(400), integral(0), previous_error(0), lastTime(0), SPEED_OF_SOUND(0.0343),
+      kp_turn(2.0), ki_turn(0.1), kd_turn(0.05), kp_forward(0.4), ki_forward(0.1), kd_forward(0.01) {}
 
     void init() {
         while (rollOffset >= 360) {
             readRoll(rollOffset);
         }
         readRoll(roll);
-        Serial.print("rollOffset: ");
-        Serial.println(rollOffset);
-        Serial.print("roll: ");
-        Serial.println(roll);
+        Serial.println("Initialization Complete");
     }
 
     void run() {
@@ -33,7 +23,23 @@ public:
             stopMotors();
             performUTurn();
         } else {
-            moveForward(100); 
+            switch (currentDirection) {
+                case FORWARD:
+                    moveForward(100);
+                    break;
+                case BACKWARD:
+                    moveBackward(100);
+                    break;
+                case STRAFE_LEFT:
+                    strafeLeft(100);
+                    break;
+                case STRAFE_RIGHT:
+                    strafeRight(100);
+                    break;
+                default:
+                    stopMotors();
+                    break;
+            }
         }
     }
 
@@ -57,7 +63,6 @@ public:
     }
 
     void moveForward(int speed) {
-        // Example of using PID for forward motion
         double outputRoll = 0;
         readRoll(roll);
         double dev = roll - rollOffset;
@@ -74,7 +79,6 @@ public:
     }
 
     void turn(double degrees, double kp, double ki, double kd) {
-        readRoll(roll);
         double outputRoll = 0;
         double dev = roll - rollOffset;
         normalizeAngle(dev);
@@ -87,7 +91,6 @@ public:
         stopMotors();
         rollOffset += degrees;
         normalizeAngle(rollOffset);
-        turnFlag = 0;
     }
 
     bool PID(double Kp, double Ki, double Kd, double target, double input, double &output) {
@@ -101,11 +104,11 @@ public:
         double derivative = (error - previous_error) / (refreshRate / 1000.0);
         output = Kp * error + Ki * integral + Kd * derivative;
 
-        if(output > 150) output = 150;
-        if(output < -150) output = -150;
+        if (output > 150) output = 150;
+        if (output < -150) output = -150;
 
         previous_error = error;
-        return fabs(error) > 1.0;  
+        return fabs(error) > 1.0;
     }
 
     void normalizeAngle(double &angle) {
@@ -118,17 +121,17 @@ private:
     DualMAX14870MotorShield *const motors;
     Adafruit_BNO055 *const bno;
     const int PIN_PING;
-    float SPEED_OF_SOUND;
+    const float SPEED_OF_SOUND;
 
     sensors_event_t orientationData;
     double roll, rollOffset;
     volatile double integral, previous_error;
     volatile unsigned long lastTime;
-    const unsigned int refreshRate = 50; 
+    const unsigned int refreshRate = 50;
 
     volatile double frontDis = 0;
     volatile int turnFlag = 0;
 
-    double kp_turn, ki_turn, kd_turn;
-    double kp_forward, ki_forward, kd_forward;
+    const double kp_turn, ki_turn, kd_turn;
+    const double kp_forward, ki_forward, kd_forward;
 };
