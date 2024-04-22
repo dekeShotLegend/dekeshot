@@ -1,6 +1,6 @@
 /**
 * Developer: Seyi R. Afolayan 
-* Work: Controller Class with PID control 
+* Work: Controller Class with PID control (From Lab 4)
 **/
 /***************************************************************************BEGIN CODE****************************************************************/
 class Controller {
