@@ -9,14 +9,14 @@
 HardwareSerial  &xbeeSerial = Serial1; 
 
 /***************************************************************************MAIN FUNCTION********************************************************************/
-void setup(){
+void setupXbeeComm(){
   // Begin serial communications for both regular debugging and the Zigbee
   Serial.begin(115200); 
   xbeeSerial.begin(115200); 
   Serial.println("Waiting for match information...");
 }
 
-void loop(){
+void handleXbeeComm(){
   /**
   The loop does two things - SEND AND RECIEVE DATA
   SEND DATA
