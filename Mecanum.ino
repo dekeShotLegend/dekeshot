@@ -22,30 +22,30 @@ void setup() {
 
 void loop() {
   moveForward();
-  delay(2000); // Stop for 2 seconds
+  delay(2000); 
 
   moveBackward();
-  delay(2000); // Stop for 2 seconds
+  delay(2000);
 
   strafeRight();
-  delay(2000); // Stop for 2 seconds
+  delay(2000); 
 
   strafeLeft();
-  delay(2000); // Stop for 2 seconds
+  delay(2000); 
 
   turnRight90();
-  delay(2000); // Stop for 2 seconds
+  delay(2000); 
 
   turnLeft90();
-  delay(2000); // Stop for 2 seconds
+  delay(2000); 
 
   performUTurn();
-  delay(2000); // Stop for 2 seconds
+  delay(2000);
   
-  stopAllMotors(); // Ensures motors are stopped at the end of the sequence
+  stopAllMotors(); 
 
   while(true) {
-    delay(10); // Keeps the Arduino program from looping
+    delay(10); 
   }
 }
 
@@ -72,12 +72,11 @@ void setAllMotorSpeeds(int speed) {
 
 void turnRight90() {
   Serial.println("Turning Right 90 Degrees");
-  // Assuming turning right involves these wheel directions for 90 degrees
   frontLeft->run(FORWARD);
   frontRight->run(RELEASE);
   backLeft->run(FORWARD);
   backRight->run(RELEASE);
-  delay(500); // Adjust timing based on actual turning speed
+  delay(500); 
 }
 
 void turnLeft90() {
