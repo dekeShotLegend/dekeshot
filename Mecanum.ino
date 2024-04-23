@@ -17,18 +17,36 @@ Adafruit_DCMotor *backLeft;
 void setup() {
   initializeSerial();
   initializeMotors();
-  setAllMotorSpeeds(200);
+  setAllMotorSpeeds(50);
 }
 
 void loop() {
-  moveDiagonalForwardRight();
-  moveDiagonalForwardLeft();
   moveForward();
+  delay(2000); // Stop for 2 seconds
+
   moveBackward();
-  strafeLeft();
+  delay(2000); // Stop for 2 seconds
+
   strafeRight();
+  delay(2000); // Stop for 2 seconds
+
+  strafeLeft();
+  delay(2000); // Stop for 2 seconds
+
+  turnRight90();
+  delay(2000); // Stop for 2 seconds
+
+  turnLeft90();
+  delay(2000); // Stop for 2 seconds
+
   performUTurn();
-  stopAllMotors();
+  delay(2000); // Stop for 2 seconds
+  
+  stopAllMotors(); // Ensures motors are stopped at the end of the sequence
+
+  while(true) {
+    delay(10); // Keeps the Arduino program from looping
+  }
 }
 
 /**********************************************************************CONTROL FUNCTION********************************************************************/
@@ -52,26 +70,45 @@ void setAllMotorSpeeds(int speed) {
   backRight->setSpeed(speed);     
 }
 
+void turnRight90() {
+  Serial.println("Turning Right 90 Degrees");
+  // Assuming turning right involves these wheel directions for 90 degrees
+  frontLeft->run(FORWARD);
+  frontRight->run(RELEASE);
+  backLeft->run(FORWARD);
+  backRight->run(RELEASE);
+  delay(500); // Adjust timing based on actual turning speed
+}
+
+void turnLeft90() {
+  Serial.println("Turning Left 90 Degrees");
+  frontLeft->run(RELEASE);
+  frontRight->run(FORWARD);
+  backLeft->run(RELEASE);
+  backRight->run(FORWARD);
+  delay(500);
+}
+
 void moveDiagonalForwardRight() {
   Serial.println("Moving Diagonal Forward Right");
   frontLeft->run(FORWARD);
-  frontRight->run(BACKWARD);
-  backLeft->run(BACKWARD);
+  frontRight->run(RELEASE);
+  backLeft->run(RELEASE);
   backRight->run(FORWARD);
   delay(1000);
 }
 
 void moveDiagonalForwardLeft() {
   Serial.println("Moving Diagonal Forward Left");
-  frontLeft->run(BACKWARD);
+  frontLeft->run(RELEASE);
   frontRight->run(FORWARD);
   backLeft->run(FORWARD);
-  backRight->run(BACKWARD);
+  backRight->run(RELEASE);
   delay(1000);
 }
 
 void moveForward() {
-  Serial.println("Moving Forward");
+  Serial.println("Moving Forward!");
   frontLeft->run(FORWARD);
   frontRight->run(FORWARD);
   backLeft->run(FORWARD);
@@ -80,7 +117,7 @@ void moveForward() {
 }
 
 void moveBackward() {
-  Serial.println("Moving Backward");
+  Serial.println("Reverse!)");
   frontLeft->run(BACKWARD);
   frontRight->run(BACKWARD);
   backLeft->run(BACKWARD);
@@ -88,23 +125,25 @@ void moveBackward() {
   delay(1000);
 }
 
-void strafeLeft() {
-  Serial.println("Moving Sideways Left");
-  frontLeft->run(BACKWARD);
-  frontRight->run(FORWARD);
+
+void strafeRight() {
+  Serial.println("Strafing Right");
+  frontLeft->run(FORWARD);
+  frontRight->run(BACKWARD);
   backLeft->run(BACKWARD);
   backRight->run(FORWARD);
   delay(1000);
 }
 
-void strafeRight() {
-  Serial.println("Moving Sideways Right");
-  frontLeft->run(FORWARD);
-  frontRight->run(BACKWARD);
+void strafeLeft() {
+  Serial.println("Strafing Left");
+  frontLeft->run(BACKWARD);
+  frontRight->run(FORWARD);
   backLeft->run(FORWARD);
   backRight->run(BACKWARD);
   delay(1000);
 }
+
 
 void performUTurn() {
   Serial.println("Performing U-Turn");
