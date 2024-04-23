@@ -1,5 +1,6 @@
 /**
-* Developer: Team DekeShot 04/22/24
+* Developer: Seyi R. Afolayan 
+* Team: DekeShot 04/22/24
 * Work: Modified ZigBee functionality (JHU hockey tracking)
 **/
 /***************************************************************************BEGIN CODE***********************************************************************/
@@ -31,8 +32,9 @@ void loop(){
   // Let's see if we got data coming in 
   if (xbeeSerial.available()){
     String incomingXbeeData = xbeeSerial.readStringUntil('\n'); 
-    if (!incomingXbeeData.isEmpty())
-    parseIncomingData(incomingXbeeData.trim());
+    incomingXbeeData.trim(); // Trims the whitespace
+    if (incomingXbeeData.length() > 0)
+    parseIncomingData(incomingXbeeData);
   }
 }
 
@@ -58,7 +60,7 @@ void parseIncomingData(const String& data) {
   String matchByte = data.substring(0, indexFirstComma);
   String matchTime = data.substring(indexFirstComma + 1, indexSecondComma);
   String posX = data.substring(indexSecondComma + 1, indexThirdComma); 
-  string posY = data.substring(indexThirdComma + 1);
+  String posY = data.substring(indexThirdComma + 1);
   
   // Check if the 2D position of the robot is available: 
   if (posX == "___" || posY == "___"){
