@@ -63,7 +63,7 @@ void parseIncomingData(const String& data) {
   String posY = data.substring(indexThirdComma + 1);
   
   // Check if the 2D position of the robot is available: 
-  if (posX == "___" || posY == "___"){
+  if (posX == "---" || posY == "---"){
     Serial.println("Jhu Hockey Robot Location is not available."); 
     return;
   }
