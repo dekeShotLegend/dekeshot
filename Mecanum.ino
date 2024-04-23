@@ -52,7 +52,7 @@ void loop() {
 /**********************************************************************CONTROL FUNCTION********************************************************************/
 void initializeSerial() {
   Serial.begin(9600);
-  Serial.println("Adafruit Motorshield v2 - DC Motor Mecanum Test");
+  Serial.println("Adafruit Motorshield v3 - DC Motor Mecanum Test");
 }
 
 void initializeMotors() {
