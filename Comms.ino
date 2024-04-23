@@ -24,7 +24,7 @@ void loop(){
   */
   static size_t prevQueryTime{millis()}; 
   if ((millis() - prevQueryTime) > 1000) {
-    xbeeSerial.write('?'); 
+    xbeeSerial.print('?'); 
     prevQueryTime = millis(); // Update the query time which effectively resets the time for the next query. 
   }
 
