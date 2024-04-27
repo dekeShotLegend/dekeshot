@@ -1,68 +1,69 @@
-/**
-* Developer: Seyi R. Afolayan
-* Work: Controller Class with PID control and Mecanum wheel integration
-**/
+// //
+// // Created by Oluwaseyi R. Afolayan on 4/27/24.
+// //
+
+#ifndef COMMUNICATION_CONTROLLER_H
+#define COMMUNICATION_CONTROLLER_H
 
 #include <Arduino.h>
 #include <Pixy2.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
-#include "MecanumRobot.h"  // Include the MecanumRobot class header
+#include "MecanumRobot.h"
 
 class Controller {
 public:
-    Controller(Pixy2* pixy, int pinPing, Adafruit_BNO055* bno, MecanumRobot* robot)
-        : pixy(pixy), PIN_PING(pinPing), bno(bno), robot(robot) {}  // Ensure robot is passed as a pointer
+    Controller(Pixy2 *pixy, int pinPing, Adafruit_BNO055 *bno, MecanumRobot *robot)
+        : pixy(pixy), PIN_PING(pinPing), robot(robot), bno(bno) {
+        // Initialize PID constants
+        kp_turn = 2.0;
+        ki_turn = 0.1;
+        kd_turn = 0.05;
+        kp_forward = 0.4;
+        ki_forward = 0.1;
+        kd_forward = 0.01;
+        refreshRate = 50; // PID refresh rate in milliseconds
+    }
 
     void init() {
-        Serial.begin(9600);
+        Serial.begin(115200);
         if (!bno->begin()) {
             Serial.println("No BNO055 detected. Check your wiring.");
-            while (1);  // Hang if sensor is not detected
+            while (1); // Hang if sensor is not detected
         }
         bno->setExtCrystalUse(true);
-
-        robot->initializeMotors(); // Use the robot instance passed to the controller
-        robot->setAllMotorSpeeds(50);  // Default speed for all motors
-
-        rollOffset = readInitialRollOffset();
-        Serial.print("rollOffset: ");
-        Serial.println(rollOffset);
-        Serial.print("roll: ");
-        Serial.println(roll);
+        robot->initializeMotors();
+        robot->setAllMotorSpeeds(50); // Default speed for all motors
+        readInitialRollOffset();
     }
 
     void run() {
         updatePING();
         updatePixy();
-        if (frontDis <= 30) {
-            if (frontDis <= 11) {
-                Serial.println("Obstacle too close, stopping and turning.");
-                robot->stopAllMotors();
-                decideTurnDirection();
-            } else {
-                Serial.println("Obstacle detected, reducing speed.");
-                robot->setAllMotorSpeeds(25);
-            }
-        } else {
-            Serial.println("Path clear, moving forward.");
-            robot->moveForward();
-        }
+        processMovements();
     }
 
 private:
-    Pixy2* pixy;
-    Adafruit_BNO055* bno;
-    MecanumRobot* robot;  // Pointer to the MecanumRobot instance
+    Pixy2 *pixy;
+    MecanumRobot *robot;
+    Adafruit_BNO055 *bno;
     int PIN_PING;
-    float frontDis = 0.0;
-    double roll, rollOffset = 400;
+    double kp_turn, ki_turn, kd_turn, kp_forward, ki_forward, kd_forward;
+    double rollOffset, roll;
+    float frontDis;
+    int turnFlag;
+    unsigned int refreshRate;
+    volatile double integral = 0, previous_error = 0;
 
     void updatePixy() {
         pixy->ccc.getBlocks();
         if (pixy->ccc.numBlocks > 0) {
-            Serial.println("Detected object with Pixy2.");
+            turnFlag = pixy->ccc.blocks[0].m_signature; // Assume m_signature dictates turn direction
+            Serial.print("Turn Flag detected: ");
+            Serial.println(turnFlag);
+        } else {
+            turnFlag = 0;
         }
     }
 
@@ -75,18 +76,74 @@ private:
         digitalWrite(PIN_PING, LOW);
         pinMode(PIN_PING, INPUT);
         unsigned long pulseDuration = pulseIn(PIN_PING, HIGH);
-        frontDis = (pulseDuration / 2) * 0.0343;  // cm per microsecond
+        frontDis = (pulseDuration / 2) * 0.0343; // Speed of sound in cm/us
         Serial.print("Front distance: ");
         Serial.println(frontDis);
     }
 
-    double readInitialRollOffset() {
-        double initialRoll;
-        readRoll(initialRoll);
-        while (initialRoll >= 360) {
-            readRoll(initialRoll);
+    void processMovements() {
+        if (frontDis <= 11) {
+            robot->stopAllMotors();
+            if (turnFlag != 0) {
+                performTurnBasedOnFlag();
+            } else {
+                performEmergencyManeuver();
+            }
+        } else if (frontDis > 11 && frontDis <= 30) {
+            adjustSpeedForSafety();
+        } else {
+            forward(80, kp_forward, ki_forward, kd_forward);
         }
-        return initialRoll;
+    }
+
+    void performTurnBasedOnFlag() {
+        switch (turnFlag) {
+            case 1: turn(-90, kp_turn, ki_turn, kd_turn); break;
+            case 2: turn(90, kp_turn, ki_turn, kd_turn); break;
+            default: performEmergencyManeuver(); break;
+        }
+    }
+
+    void performEmergencyManeuver() {
+        // Custom logic for emergency maneuvers
+        turn(180, kp_turn, ki_turn, kd_turn); // Example: 180-degree turn
+    }
+
+    void adjustSpeedForSafety() {
+        robot->setAllMotorSpeeds(25); // Reduce speed in potentially risky areas
+    }
+
+    void forward(int speed, double kp, double ki, double kd) {
+        readRoll(roll);
+        double output = calculatePID(roll - rollOffset, kp, ki, kd);
+        robot->setMotorSpeeds(speed + output, speed - output);
+    }
+
+    void turn(double degrees, double kp, double ki, double kd) {
+        double target = rollOffset + degrees;
+        double currentRoll;
+        do {
+            readRoll(currentRoll);
+            double output = calculatePID(target - currentRoll, kp, ki, kd);
+            robot->setMotorSpeeds(output, -output);
+        } while (!isTurnComplete(target, currentRoll));
+        rollOffset = target;
+    }
+
+    bool isTurnComplete(double target, double current) {
+        return abs(target - current) < 5; // 5 degrees tolerance
+    }
+
+    double calculatePID(double error, double kp, double ki, double kd) {
+        integral += error;
+        double derivative = error - previous_error;
+        previous_error = error;
+        return kp * error + ki * integral + kd * derivative;
+    }
+
+    void readInitialRollOffset() {
+        readRoll(rollOffset);
+        while (rollOffset >= 360) readRoll(rollOffset);
     }
 
     void readRoll(double& val) {
@@ -95,9 +152,7 @@ private:
         val = event.orientation.x;
         if (val >= 180) val -= 360;
     }
-
-    void decideTurnDirection() {
-        // Placeholder for decision logic to turn based on sensor inputs
-        robot->turnRight90(); // Example function to turn right
-    }
 };
+
+#endif // COMMUNICATION_CONTROLLER_H
+
