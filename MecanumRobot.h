@@ -1,4 +1,4 @@
-// Developer: Seyi R. Afolayan
+// Check if the header file is already included
 #ifndef MECANUM_ROBOT_H
 #define MECANUM_ROBOT_H
 
@@ -8,7 +8,7 @@
 
 class MecanumRobot {
 public:
-    MecanumRobot() : motorShield(Adafruit_MotorShield()), speed(50) {
+    MecanumRobot() : motorShield(Adafruit_MotorShield()), speed(50), rotateSpeed(30) {  // Initialize it here
         initializeMotors();
     }
 
@@ -27,13 +27,22 @@ public:
         backLeft->setSpeed(speed);
         backRight->setSpeed(speed);
     }
-        // Set individual motor speeds for advanced maneuvers
-    void setMotorSpeeds(int leftSpeed, int rightSpeed) {
-        frontLeft->setSpeed(leftSpeed);
-        backLeft->setSpeed(leftSpeed);
-        frontRight->setSpeed(rightSpeed);
-        backRight->setSpeed(rightSpeed);
-    }
+    // Set individual motor speeds for advanced maneuvers
+    void MecanumRobot::setMotorSpeeds(int leftSpeed, int rightSpeed) {
+    // Set the speed and direction for the left motors
+    frontLeft->setSpeed(abs(leftSpeed));
+    backLeft->setSpeed(abs(leftSpeed));
+    frontLeft->run((leftSpeed >= 0) ? FORWARD : BACKWARD);
+    backLeft->run((leftSpeed >= 0) ? FORWARD : BACKWARD);
+
+    // Set the speed and direction for the right motors
+    frontRight->setSpeed(abs(rightSpeed));
+    backRight->setSpeed(abs(rightSpeed));
+    frontRight->run((rightSpeed >= 0) ? FORWARD : BACKWARD);
+    backRight->run((rightSpeed >= 0) ? FORWARD : BACKWARD);
+}
+
+
 
     void moveForward() {
         Serial.println("Moving Forward!");
@@ -100,11 +109,27 @@ public:
         backLeft->run(RELEASE);
         backRight->run(RELEASE);
     }
+    void MecanumRobot::searchForPuck() {
+    static size_t lastUpdate{0}, currentTime{millis()};
+    static float angle{0.0}; // Continuous angle increment
+
+    if (currentTime - lastUpdate > 100) {  // Update every 100 ms for smoother operation
+        lastUpdate = currentTime;
+        angle += 0.05;  // Increase the angle to create spiral motion
+
+        // Calculate dynamic speeds based on the angle
+        int leftSpeed = speed + sin(angle) * speed; // Modulate left speed with sine wave
+        int rightSpeed = speed + cos(angle) * speed; // Modulate right speed with cosine wave
+
+        // Set speeds for left and right sides
+        setMotorSpeeds(leftSpeed, rightSpeed);
+    }
+}
 
 private:
     Adafruit_MotorShield motorShield;
     Adafruit_DCMotor *frontRight, *frontLeft, *backRight, *backLeft;
-    int speed;
+    int speed, rotateSpeed;
 
     void runAllMotors(uint8_t direction) {
         frontLeft->setSpeed(speed);
