@@ -5,9 +5,15 @@
  * Work: Modified ZigBee functionality (JHU hockey tracking)
  **/
 /****************************************************************************BEGIN CODE****************************************************************************/
-// Import necessary library
-#include <HardwareSerial.h>
+// Structure for holding our data
 #include <Arduino.h>
+struct RobotData {
+    String matchStatus;
+    String matchTime;
+    float posX;
+    float posY;
+};
+RobotData robotData; 
 
 class XbeeCommunicator {
 private:
@@ -67,20 +73,23 @@ public:
         int indexSecondComma = data.indexOf(',', indexFirstComma + 1);
         int indexThirdComma = data.indexOf(',', indexSecondComma + 1);
 
-        String matchByte = data.substring(0, indexFirstComma);
-        String matchTime = data.substring(indexFirstComma + 1, indexSecondComma);
-        String posX = data.substring(indexSecondComma + 1, indexThirdComma);
-        String posY = data.substring(indexThirdComma + 1);
+        robotData.matchStatus = data.substring(0, indexFirstComma);
+        robotData.matchTime = data.substring(indexFirstComma + 1, indexSecondComma);
+        String posXstr = data.substring(indexSecondComma + 1, indexThirdComma);
+        String posYstr = data.substring(indexThirdComma + 1);
 
-        if (posX == "---" || posY == "---") {
+        if (posXstr == "---" || posYstr == "---") {
             Serial.println("Jhu Hockey Robot Location is not available.");
             return;
         }
 
+        robotData.posX = posXstr.toFloat(); 
+        robotData.posY = posYstr.toFloat();
+
         // Log data to serial monitor
-        Serial.print("Match Status: "); Serial.println(matchByte == "1" ? "Ongoing" : "Not Active");
-        Serial.print("Match Time: "); Serial.println(matchTime);
-        Serial.print("Position X: "); Serial.println(posX);
-        Serial.print("Position Y: "); Serial.println(posY);
+        Serial.print("Match Status: "); Serial.println(robotData.matchStatus == "1" ? "Ongoing" : "Not Active");
+        Serial.print("Match Time: "); Serial.println(robotData.matchTime);
+        Serial.print("Position X: "); Serial.println(robotData.posX);
+        Serial.print("Position Y: "); Serial.println(robotData.posY);
     }
 };
