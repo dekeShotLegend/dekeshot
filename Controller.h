@@ -1,10 +1,11 @@
-// //
-// // Created by Oluwaseyi R. Afolayan on 4/27/24.
-// //
+/**
+* Developer: Seyi R. Afolayan
+* Work: Controller Class 
+**/
+/********************************************************BEGIN CODE******************************************************************/
 
 #ifndef COMMUNICATION_CONTROLLER_H
 #define COMMUNICATION_CONTROLLER_H
-
 #include <Arduino.h>
 #include <Pixy2.h>
 #include <Adafruit_Sensor.h>
@@ -12,6 +13,19 @@
 #include <utility/imumaths.h>
 #include "MecanumRobot.h"
 
+// Puck tracking structure
+struct Puck {
+    int x; // x_cord of the cam frame
+    int y; // y_cord of the cam frame
+    int width; // Width of the detected object
+    int height; // Height of the detected object
+};
+Puck puck;
+
+#define PUCK_SIGNATURE 1 // PLEASE change this if you calibrated the pixy using another signature.
+
+/********************************************************CONTROLLER CLASS************************************************************/
+// The legendary Robot controller class
 class Controller {
 public:
     Controller(Pixy2 *pixy, int pinPing, Adafruit_BNO055 *bno, MecanumRobot *robot)
@@ -45,28 +59,55 @@ public:
     }
 
 private:
-    Pixy2 *pixy;
-    MecanumRobot *robot;
-    Adafruit_BNO055 *bno;
+    Pixy2* pixy;
+    MecanumRobot* robot;
+    Adafruit_BNO055* bno;
     int PIN_PING;
     double kp_turn, ki_turn, kd_turn, kp_forward, ki_forward, kd_forward;
     double rollOffset, roll;
     float frontDis;
     int turnFlag;
     unsigned int refreshRate;
-    volatile double integral = 0, previous_error = 0;
+    volatile double integral{0}, previous_error{0};
 
     void updatePixy() {
-        pixy->ccc.getBlocks();
-        if (pixy->ccc.numBlocks > 0) {
-            turnFlag = pixy->ccc.blocks[0].m_signature; // Assume m_signature dictates turn direction
-            Serial.print("Turn Flag detected: ");
-            Serial.println(turnFlag);
+        int blockCount = pixy->ccc.getBlocks();
+        if (blockCount > 0) {
+            for (int i = 0; i < blockCount; ++i) {
+                if (pixy->ccc.blocks[i].m_signature == PUCK_SIGNATURE) {
+                    puck.x = pixy->ccc.blocks[i].m_x;
+                    puck.y = pixy->ccc.blocks[i].m_y;
+                    puck.width = pixy->ccc.blocks[i].m_width;
+                    puck.height = pixy->ccc.blocks[i].m_height;
+
+                    Serial.print("Puck detected at: ");
+                    Serial.print(puck.x);
+                    Serial.print(", ");
+                    Serial.println(puck.y);
+                    break;
+                }
+            }
         } else {
-            turnFlag = 0;
+            Serial.println("No puck detected");
         }
     }
 
+    void driveTowardsPuck() {
+        if (puck.x > 0) {
+            int centerX = 160;
+            int error = puck.x - centerX;
+            if (abs(error) > 10) {
+                if (error > 0) {
+                    robot->turnRight90();
+                } else {
+                    robot->turnLeft90();
+                }
+            }
+            robot->moveForward();
+        } else {
+            robot->stopAllMotors();
+        }
+    }
     void updatePING() {
         pinMode(PIN_PING, OUTPUT);
         digitalWrite(PIN_PING, LOW);
