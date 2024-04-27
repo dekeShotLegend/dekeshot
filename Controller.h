@@ -111,6 +111,24 @@ public:
         angle = event.orientation.x; // Assuming roll is around the x-axis
     }
 
+    void updatePING() {
+        pinMode(PIN_PING, OUTPUT); // Set the pin as output for sending the pulse
+        digitalWrite(PIN_PING, LOW); // Ensure a clean LOW pulse
+        delayMicroseconds(2); // Wait for two microseconds
+        digitalWrite(PIN_PING, HIGH); // Send a HIGH pulse
+        delayMicroseconds(10); // Wait for ten microseconds
+        digitalWrite(PIN_PING, LOW); // Turn off the pulse
+
+        pinMode(PIN_PING, INPUT); // Switch pin to input to receive the echo
+        long duration = pulseIn(PIN_PING, HIGH); // Measure the length of the incoming pulse
+
+        // Calculate the distance based on the time it took for the echo to return
+        frontDis = (duration * 0.0343) / 2; // Speed of sound constant divided by 2 (to and fro)
+
+        Serial.print("Measured Distance: ");
+        Serial.println(frontDis);
+    }
+
 private:
     Pixy2 *const pixy;
     Adafruit_MotorShield *const shield;
