@@ -1,7 +1,8 @@
-
-
-
-
+/**
+* Developer: Seyi R. Afolayan
+* Work: Main Controller Logic 
+**/
+/********************************************************BEGIN CODE*****************************************************/
 // Include necessary library headers
 #include <Arduino.h>
 #include <Wire.h>
