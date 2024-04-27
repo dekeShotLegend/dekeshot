@@ -3,146 +3,101 @@
 * Work: Controller Class with PID control and Mecanum wheel integration
 **/
 
-#include <Adafruit_MotorShield.h>
-#include "utility/Adafruit_MS_PWMServoDriver.h"
+#include <Arduino.h>
+#include <Pixy2.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
+#include "MecanumRobot.h"  // Include the MecanumRobot class header
 
 class Controller {
 public:
-    Controller(Pixy2 *pixy, int pinPing, Adafruit_MotorShield *shield, Adafruit_BNO055 *bno)
-    : pixy(pixy), shield(shield), PIN_PING(pinPing), bno(bno), rollOffset(0), integral(0), previous_error(0), lastTime(0), SPEED_OF_SOUND(0.0343),
-      kp_turn(2.0), ki_turn(0.1), kd_turn(0.05), kp_forward(0.4), ki_forward(0.1), kd_forward(0.01) {
-        motors[0] = shield->getMotor(1);
-        motors[1] = shield->getMotor(2);
-        motors[2] = shield->getMotor(3);
-        motors[3] = shield->getMotor(4);
-    }
+    Controller(Pixy2* pixy, int pinPing, Adafruit_BNO055* bno, MecanumRobot* robot)
+        : pixy(pixy), PIN_PING(pinPing), bno(bno), robot(robot) {}  // Ensure robot is passed as a pointer
 
     void init() {
-        shield->begin();
         Serial.begin(9600);
-        Serial.println("Initialization Complete - Mecanum Wheel Robot");
         if (!bno->begin()) {
-            Serial.print("No BNO055 detected");
+            Serial.println("No BNO055 detected. Check your wiring.");
+            while (1);  // Hang if sensor is not detected
         }
         bno->setExtCrystalUse(true);
-        readRoll(rollOffset); // Initial reading to set baseline roll offset
+
+        robot->initializeMotors(); // Use the robot instance passed to the controller
+        robot->setAllMotorSpeeds(50);  // Default speed for all motors
+
+        rollOffset = readInitialRollOffset();
+        Serial.print("rollOffset: ");
+        Serial.println(rollOffset);
+        Serial.print("roll: ");
+        Serial.println(roll);
     }
 
     void run() {
         updatePING();
-        if (frontDis <= 11) {
-            stopAllMotors();
-            performUTurn();
+        updatePixy();
+        if (frontDis <= 30) {
+            if (frontDis <= 11) {
+                Serial.println("Obstacle too close, stopping and turning.");
+                robot->stopAllMotors();
+                decideTurnDirection();
+            } else {
+                Serial.println("Obstacle detected, reducing speed.");
+                robot->setAllMotorSpeeds(25);
+            }
         } else {
-            moveForward(100);  // Add conditional control logic as needed
+            Serial.println("Path clear, moving forward.");
+            robot->moveForward();
         }
-    }
-
-    void stopAllMotors() {
-        for (int i = 0; i < 4; i++) {
-            motors[i]->run(RELEASE);
-        }
-    }
-
-    void moveForward(int speed) {
-        applyMotorCommands(FORWARD, FORWARD, FORWARD, FORWARD, speed);
-    }
-
-    void strafeRight(int speed) {
-        applyMotorCommands(FORWARD, BACKWARD, BACKWARD, FORWARD, speed);
-    }
-
-    void performUTurn() {
-        turn(180, kp_turn, ki_turn, kd_turn);
-    }
-
-    void applyMotorCommands(uint8_t fl, uint8_t fr, uint8_t bl, uint8_t br, int speed) {
-        motors[0]->setSpeed(speed);
-        motors[0]->run(fl);
-        motors[1]->setSpeed(speed);
-        motors[1]->run(fr);
-        motors[2]->setSpeed(speed);
-        motors[2]->run(bl);
-        motors[3]->setSpeed(speed);
-        motors[3]->run(br);
-    }
-
-    void turn(double degrees, double kp, double ki, double kd) {
-        double outputRoll = 0;
-        double dev = roll - rollOffset;
-        normalizeAngle(dev);
-        while (PID(kp, ki, kd, degrees, dev, outputRoll)) {
-            delay(10);
-            readRoll(roll);
-            dev = roll - rollOffset;
-            normalizeAngle(dev);
-        }
-        stopAllMotors();
-        rollOffset += degrees;
-        normalizeAngle(rollOffset);
-    }
-
-    bool PID(double Kp, double Ki, double Kd, double target, double input, double &output) {
-        unsigned long now = millis();
-        if (now - lastTime < refreshRate) {
-            return true;
-        }
-        lastTime = now;
-        double error = target - input;
-        integral += error * (refreshRate / 1000.0);
-        double derivative = (error - previous_error) / (refreshRate / 1000.0);
-        output = Kp * error + Ki * integral + Kd * derivative;
-
-        if (output > 150) output = 150;
-        if (output < -150) output = -150;
-
-        previous_error = error;
-        return fabs(error) > 1.0;
-    }
-
-    void normalizeAngle(double &angle) {
-        if (angle > 180) angle -= 360;
-        if (angle < -180) angle += 360;
-    }
-
-    void readRoll(double &angle) {
-        sensors_event_t event;
-        bno->getEvent(&event, Adafruit_BNO055::VECTOR_EULER);
-        angle = event.orientation.x; // Assuming roll is around the x-axis
-    }
-
-    void updatePING() {
-        pinMode(PIN_PING, OUTPUT); // Set the pin as output for sending the pulse
-        digitalWrite(PIN_PING, LOW); // Ensure a clean LOW pulse
-        delayMicroseconds(2); // Wait for two microseconds
-        digitalWrite(PIN_PING, HIGH); // Send a HIGH pulse
-        delayMicroseconds(10); // Wait for ten microseconds
-        digitalWrite(PIN_PING, LOW); // Turn off the pulse
-
-        pinMode(PIN_PING, INPUT); // Switch pin to input to receive the echo
-        long duration = pulseIn(PIN_PING, HIGH); // Measure the length of the incoming pulse
-
-        // Calculate the distance based on the time it took for the echo to return
-        frontDis = (duration * 0.0343) / 2; // Speed of sound constant divided by 2 (to and fro)
-
-        Serial.print("Measured Distance: ");
-        Serial.println(frontDis);
     }
 
 private:
-    Pixy2 *const pixy;
-    Adafruit_MotorShield *const shield;
-    Adafruit_DCMotor *motors[4];
-    Adafruit_BNO055 *const bno;
-    const int PIN_PING;
-    const float SPEED_OF_SOUND;
+    Pixy2* pixy;
+    Adafruit_BNO055* bno;
+    MecanumRobot* robot;  // Pointer to the MecanumRobot instance
+    int PIN_PING;
+    float frontDis = 0.0;
+    double roll, rollOffset = 400;
 
-    double roll, rollOffset;
-    volatile double integral, previous_error;
-    volatile unsigned long lastTime;
-    const unsigned int refreshRate = 50;
+    void updatePixy() {
+        pixy->ccc.getBlocks();
+        if (pixy->ccc.numBlocks > 0) {
+            Serial.println("Detected object with Pixy2.");
+        }
+    }
 
-    volatile double frontDis = 0;
-    const double kp_turn, ki_turn, kd_turn;
-    const double kp_forward, ki_forward, kd_forward;
+    void updatePING() {
+        pinMode(PIN_PING, OUTPUT);
+        digitalWrite(PIN_PING, LOW);
+        delayMicroseconds(2);
+        digitalWrite(PIN_PING, HIGH);
+        delayMicroseconds(5);
+        digitalWrite(PIN_PING, LOW);
+        pinMode(PIN_PING, INPUT);
+        unsigned long pulseDuration = pulseIn(PIN_PING, HIGH);
+        frontDis = (pulseDuration / 2) * 0.0343;  // cm per microsecond
+        Serial.print("Front distance: ");
+        Serial.println(frontDis);
+    }
+
+    double readInitialRollOffset() {
+        double initialRoll;
+        readRoll(initialRoll);
+        while (initialRoll >= 360) {
+            readRoll(initialRoll);
+        }
+        return initialRoll;
+    }
+
+    void readRoll(double& val) {
+        sensors_event_t event;
+        bno->getEvent(&event, Adafruit_BNO055::VECTOR_EULER);
+        val = event.orientation.x;
+        if (val >= 180) val -= 360;
+    }
+
+    void decideTurnDirection() {
+        // Placeholder for decision logic to turn based on sensor inputs
+        robot->turnRight90(); // Example function to turn right
+    }
 };
