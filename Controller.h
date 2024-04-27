@@ -25,7 +25,7 @@ Puck puck;
 #define PUCK_SIGNATURE 1 // PLEASE change this if you calibrated the pixy using another signature.
 
 /********************************************************CONTROLLER CLASS************************************************************/
-// The legendary Robot controller class
+// The legendary Robot controller class (some of the codes are from lab4 so maybe correct the readroll stuff or what not)
 class Controller {
 public:
     Controller(Pixy2 *pixy, int pinPing, Adafruit_BNO055 *bno, MecanumRobot *robot)
@@ -52,7 +52,7 @@ public:
         readInitialRollOffset();
     }
 
-    void run() {
+    void Controller::run() {
         updatePING();
         updatePixy();
         processMovements();
@@ -70,44 +70,54 @@ private:
     unsigned int refreshRate;
     volatile double integral{0}, previous_error{0};
 
-    void updatePixy() {
-        int blockCount = pixy->ccc.getBlocks();
-        if (blockCount > 0) {
-            for (int i = 0; i < blockCount; ++i) {
-                if (pixy->ccc.blocks[i].m_signature == PUCK_SIGNATURE) {
-                    puck.x = pixy->ccc.blocks[i].m_x;
-                    puck.y = pixy->ccc.blocks[i].m_y;
-                    puck.width = pixy->ccc.blocks[i].m_width;
-                    puck.height = pixy->ccc.blocks[i].m_height;
-
-                    Serial.print("Puck detected at: ");
-                    Serial.print(puck.x);
-                    Serial.print(", ");
-                    Serial.println(puck.y);
-                    break;
+    void Controller::updatePixy() {
+    int blockCount = pixy->ccc.getBlocks();
+    if (blockCount > 0) {
+        // Process all blocks to find the one with PUCK_SIGNATURE
+        int index = -1;
+        for (int i = 0; i < blockCount; ++i) {
+            if (pixy->ccc.blocks[i].m_signature == PUCK_SIGNATURE) {
+                if (index == -1 || pixy->ccc.blocks[i].m_width * pixy->ccc.blocks[i].m_height > puck.width * puck.height) {
+                    index = i;
                 }
             }
-        } else {
-            Serial.println("No puck detected");
         }
+        if (index != -1) {
+            puck.x = pixy->ccc.blocks[index].m_x;
+            puck.y = pixy->ccc.blocks[index].m_y;
+            puck.width = pixy->ccc.blocks[index].m_width;
+            puck.height = pixy->ccc.blocks[index].m_height;
+            Serial.print("Puck detected at: ");
+            Serial.print(puck.x);
+            Serial.print(", ");
+            Serial.println(puck.y);
+            driveTowardsPuck();
+        }
+    } else {
+        Serial.println("No puck detected");
+        robot->searchForPuck();  // Implement this method in MecanumRobot to handle searching
     }
+}
 
-    void driveTowardsPuck() {
-        if (puck.x > 0) {
-            int centerX = 160;
-            int error = puck.x - centerX;
-            if (abs(error) > 10) {
-                if (error > 0) {
-                    robot->turnRight90();
-                } else {
-                    robot->turnLeft90();
-                }
-            }
-            robot->moveForward();
-        } else {
-            robot->stopAllMotors();
-        }
+    void Controller::driveTowardsPuck() {
+    int cameraCenterX = 160; // Pixy stuff is 319 so I am using 320 here
+    int errorX = puck.x - cameraCenterX;  // Calculate error from the center
+    int proportionalSpeedAdjustment = kp_turn * errorX;  // Calculate proportional speed adjustment
+
+    // Adjust motor speeds based on the horizontal error to smoothly align with the puck
+    int baseSpeed = 50;  // Base speed can be dynamically adjusted based on other factors if needed
+    int leftMotorSpeed = baseSpeed - proportionalSpeedAdjustment;
+    int rightMotorSpeed = baseSpeed + proportionalSpeedAdjustment;
+    robot->setMotorSpeeds(leftMotorSpeed, rightMotorSpeed);
+
+    // Dynamically adjust speed as the puck approaches the center
+    if (abs(errorX) < 10) {  // '10' can be adjusted based on what is considered 'centered'
+        robot->setMotorSpeeds(0, 0);  // Stop the robot or adjust to a very slow movement
+        robot->moveForward();  // This could be modified to only trigger under certain conditions
     }
+}
+
+
     void updatePING() {
         pinMode(PIN_PING, OUTPUT);
         digitalWrite(PIN_PING, LOW);
