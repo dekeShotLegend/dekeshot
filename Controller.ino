@@ -51,4 +51,14 @@ void setup() {
 void loop() {
     controller.run();
     xbeeComms.handleXbeeComm();  // Handle XBee communication in the main loop
+    if (robotData.matchStatus == "START") {
+        // I will implement the logic later
+    } else if (robotData.matchStatus == "STOP") {
+        // I will implement the logic later
+    }
+
+    // I will implement this later
+    // navigateToPosition(robotData.posX, robotData.posY);
+
+    // Other Codes 
 }
