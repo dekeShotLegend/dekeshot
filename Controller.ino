@@ -6,7 +6,6 @@
 #include <utility/imumaths.h>
 #include <Pixy2.h>
 #include "Controller.h"
-#include "XbeeCommunicator.h"
 #include "MecanumRobot.h"
 
 // Initialize sensor and controller objects
@@ -14,7 +13,8 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
 Pixy2 pixy; 
 MecanumRobot robot;  // Proper instantiation of MecanumRobot
 
-const int PIN_PING{13}; // Ping sensor 
+const int PIN_PING{49}; // Ping sensor 
+const int PIN_RELAY{44};
 
 // Instantiate the Controller and XbeeCommunicator
 Controller controller(&pixy, PIN_PING, &bno, &robot);  // Pass the robot object to the controller
@@ -35,21 +35,25 @@ void setupIMU(){
 }
 
 void setup() {
+    pinMode(PIN_RELAY,OUTPUT);
+    digitalWrite(PIN_RELAY, LOW);
     Serial.begin(115200);
     setupIMU();
     pixy.init();
+    xbeeComms.setupXbeeComm();  // Setup XBee communication
     robot.begin(); // initialize the robot motors
     controller.init();
-    xbeeComms.setupXbeeComm();  // Setup XBee communication
 }
 
 void loop() {
-    controller.run();
+    sensors_event_t event; 
+    bno.getEvent(&event);
+    controller.run(event.orientation.x);
     xbeeComms.handleXbeeComm();  // Handle XBee communication in the main loop
     if (robotData.matchStatus == "START") {
-        // I will implement the logic later
+      //robot.setAllMotorSpeeds(50);
     } else if (robotData.matchStatus == "STOP") {
-        // I will implement the logic later
+      //robot.stopAllMotors();
     }
 
     // I will implement this later

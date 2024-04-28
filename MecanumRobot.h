@@ -5,10 +5,13 @@
 #include <Adafruit_MotorShield.h>
 #include "utility/Adafruit_MS_PWMServoDriver.h"
 #include <Arduino.h>
+#include "XbeeCommunicator.h"
+
 
 class MecanumRobot {
 public:
-    static constexpr int DEFAULT_SPEED{50}, DEFAULT_ROTATE_SPEED{0};
+    bool trackingPuck=false;
+    static constexpr int DEFAULT_SPEED{0}, DEFAULT_ROTATE_SPEED{0};
 
     MecanumRobot() : speed(DEFAULT_SPEED), rotateSpeed(DEFAULT_ROTATE_SPEED) {}
 
@@ -31,6 +34,11 @@ public:
         backLeft->setSpeed(speed);
         backRight->setSpeed(speed);
     }
+
+    void setChaseStatus(bool status){
+        trackingPuck = status;
+    }
+
 
     void setMotorSpeeds(int leftSpeed, int rightSpeed) {
         frontLeft->setSpeed(abs(leftSpeed));
@@ -97,19 +105,11 @@ public:
     }
 
     void searchForPuck() {
-        static size_t lastUpdate = 0;
-        size_t currentTime = millis();
-        static float angle = 0.0; // Continuous angle increment
-
-        if (currentTime - lastUpdate > 100) {  // Update every 100 ms for smoother operation
-            lastUpdate = currentTime;
-            angle += 0.05;  // Increase the angle to create spiral motion
-
-            int leftSpeed = speed + sin(angle) * speed; // Modulate left speed with sine wave
-            int rightSpeed = speed + cos(angle) * speed; // Modulate right speed with cosine wave
-
-            setMotorSpeeds(leftSpeed, rightSpeed);
-        }
+    setMotorSpeeds(0, 0);
+    delay(100);
+    setMotorSpeeds(160, -160);
+    delay(200);
+    setMotorSpeeds(0, 0);
     }
 
 private:

@@ -41,19 +41,29 @@ public:
     // Send query to the XBee module
     void sendQuery() {
         static size_t prevQueryTime{millis()};
-        if ((millis() - prevQueryTime) > 1000) {
+        if ((millis() - prevQueryTime) > 100) {
             xbeeSerial.print('?');
             prevQueryTime = millis(); // Reset the time for the next query
         }
     }
 
-    // Receive data from XBee module
-    void receiveData() {
+    // Receive data from XBee module, try 100 times in one second,
+    // if data isn't recieved then, warn user in Serial Monitor
+    void receiveData(int tries = 0) {
+        int lastChance = 100;
+        if (tries < lastChance) {
+          Serial.println("Timeout - nothing recieved after one second");
+          return;
+        }
         if (xbeeSerial.available()) {
             String incomingXbeeData = xbeeSerial.readStringUntil('\n');
             incomingXbeeData.trim(); // Trim the whitespace
             if (incomingXbeeData.length() > 0)
                 parseIncomingData(incomingXbeeData);
+        }
+        else {
+          delay(10);
+          receiveData(tries++);
         }
     }
 
@@ -92,4 +102,5 @@ public:
         Serial.print("Position X: "); Serial.println(robotData.posX);
         Serial.print("Position Y: "); Serial.println(robotData.posY);
     }
+
 };

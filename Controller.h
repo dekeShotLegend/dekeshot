@@ -22,7 +22,7 @@ struct Puck {
 };
 Puck puck;
 
-#define PUCK_SIGNATURE 1 // PLEASE change this if you calibrated the pixy using another signature.
+#define PUCK_SIGNATURE 7 // PLEASE change this if you calibrated the pixy using another signature.
 
 /********************************************************CONTROLLER CLASS************************************************************/
 // The legendary Robot controller class (some of the codes are from lab4 so maybe correct the readroll stuff or what not)
@@ -31,7 +31,7 @@ public:
     Controller(Pixy2 *pixy, int pinPing, Adafruit_BNO055 *bno, MecanumRobot *robot)
         : pixy(pixy), PIN_PING(pinPing), robot(robot), bno(bno) {
         // Initialize PID constants
-        kp_turn = 2.0;
+        kp_turn = 0.2;
         ki_turn = 0.1;
         kd_turn = 0.05;
         kp_forward = 0.4;
@@ -39,23 +39,22 @@ public:
         kd_forward = 0.01;
         refreshRate = 50; // PID refresh rate in milliseconds
     }
-
+    float goal_x{25.0}, goal_y{60.0};
     void init() {
-        Serial.begin(115200);
         if (!bno->begin()) {
             Serial.println("No BNO055 detected. Check your wiring.");
             while (1); // Hang if sensor is not detected
         }
         bno->setExtCrystalUse(true);
         robot->initializeMotors();
-        robot->setAllMotorSpeeds(50); // Default speed for all motors
+        robot->setAllMotorSpeeds(0); // Default speed for all motors
         readInitialRollOffset();
     }
 
-    void Controller::run() {
+    void Controller::run(float heading) {
         updatePING();
         updatePixy();
-        processMovements();
+        processMovements(heading);
     }
 
 private:
@@ -83,6 +82,7 @@ private:
             }
         }
         if (index != -1) {
+            robot->setChaseStatus(true);
             puck.x = pixy->ccc.blocks[index].m_x;
             puck.y = pixy->ccc.blocks[index].m_y;
             puck.width = pixy->ccc.blocks[index].m_width;
@@ -95,7 +95,9 @@ private:
         }
     } else {
         Serial.println("No puck detected");
+        if(!(robot->trackingPuck)){
         robot->searchForPuck();  // Implement this method in MecanumRobot to handle searching
+        }
     }
 }
 
@@ -104,19 +106,29 @@ private:
     int errorX = puck.x - cameraCenterX;  // Calculate error from the center
     int proportionalSpeedAdjustment = kp_turn * errorX;  // Calculate proportional speed adjustment
 
-    // Adjust motor speeds based on the horizontal error to smoothly align with the puck
-    int baseSpeed = 50;  // Base speed can be dynamically adjusted based on other factors if needed
-    int leftMotorSpeed = baseSpeed - proportionalSpeedAdjustment;
-    int rightMotorSpeed = baseSpeed + proportionalSpeedAdjustment;
-    robot->setMotorSpeeds(leftMotorSpeed, rightMotorSpeed);
 
     // Dynamically adjust speed as the puck approaches the center
-    if (abs(errorX) < 10) {  // '10' can be adjusted based on what is considered 'centered'
+    if (abs(errorX) < 40) {  // '10' can be adjusted based on what is considered 'centered'
         robot->setMotorSpeeds(0, 0);  // Stop the robot or adjust to a very slow movement
-        robot->moveForward();  // This could be modified to only trigger under certain conditions
+        delay(100);
+        robot->setMotorSpeeds(100, 100); // This could be modified to only trigger under certain conditions
+        delay(300);
+        robot->setMotorSpeeds(0, 0);  // Stop the robot or adjust to a very slow movement
+    } else {
+          // Adjust motor speeds based on the horizontal error to smoothly align with the puck
+    int baseSpeed = 100;  // Base speed can be dynamically adjusted based on other factors if needed
+    int leftMotorSpeed = baseSpeed + proportionalSpeedAdjustment;
+    int rightMotorSpeed = baseSpeed - proportionalSpeedAdjustment;
+    robot->setMotorSpeeds(leftMotorSpeed, rightMotorSpeed);
     }
 }
 
+  float getGoalAngle(){
+    float horizontal = (robotData.posX - goal_x);
+    float vertical = (robotData.posY - goal_y);
+    float angle = (atan2(vertical,horizontal)+M_PI)*180/(M_PI);
+    return angle;
+  }
 
     void updatePING() {
         pinMode(PIN_PING, OUTPUT);
@@ -132,18 +144,12 @@ private:
         Serial.println(frontDis);
     }
 
-    void processMovements() {
-        if (frontDis <= 11) {
-            robot->stopAllMotors();
-            if (turnFlag != 0) {
-                performTurnBasedOnFlag();
-            } else {
-                performEmergencyManeuver();
-            }
-        } else if (frontDis > 11 && frontDis <= 30) {
-            adjustSpeedForSafety();
-        } else {
-            forward(80, kp_forward, ki_forward, kd_forward);
+    void processMovements(float heading) {
+        if (frontDis <= 10) {
+            robot->setChaseStatus(false);
+            turn(getGoalAngle() - heading,kp_turn,ki_turn,kd_turn);
+        } else if (frontDis > 30) {
+           robot->setChaseStatus(false);
         }
     }
 
