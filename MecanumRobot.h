@@ -7,49 +7,45 @@
 #include <Arduino.h>
 #include "XbeeCommunicator.h"
 
-
 class MecanumRobot {
 public:
-    bool trackingPuck=false;
-    static constexpr int DEFAULT_SPEED{0}, DEFAULT_ROTATE_SPEED{0};
+    static constexpr int DEFAULT_SPEED = 0;  // Default speed for all motors
+    bool trackingPuck = false;
 
-    MecanumRobot() : speed(DEFAULT_SPEED), rotateSpeed(DEFAULT_ROTATE_SPEED) {}
+    MecanumRobot() : speed(DEFAULT_SPEED) {
+        motorShield = Adafruit_MotorShield(); // Ensure the motor shield is initialized here
+    }
 
     void begin() {
-        motorShield.begin(); 
+        if (!motorShield.begin()) { // Check if the motor shield successfully initializes
+            Serial.println("Failed to start the motor shield");
+            return;
+        }
         initializeMotors();
     }
 
     void initializeMotors() {
+        // Initialize each motor and check if they are correctly set
         frontLeft = motorShield.getMotor(1); // Motor 1 is the FRONT left motor
         frontRight = motorShield.getMotor(2); // Motor 2 is the FRONT right motor
-        backLeft = motorShield.getMotor(3); // Motor 3 is the  REAR left motor
+        backLeft = motorShield.getMotor(3); // Motor 3 is the REAR left motor
         backRight = motorShield.getMotor(4); // Motor 4 is the REAR right motor 
     }
 
     void setAllMotorSpeeds(int newSpeed) {
         speed = newSpeed;
-        frontLeft->setSpeed(speed);
-        frontRight->setSpeed(speed);
-        backLeft->setSpeed(speed);
-        backRight->setSpeed(speed);
+        updateMotorSpeeds();
     }
 
-    void setChaseStatus(bool status){
+    void setChaseStatus(bool status) {
         trackingPuck = status;
     }
 
-
     void setMotorSpeeds(int leftSpeed, int rightSpeed) {
-        frontLeft->setSpeed(abs(leftSpeed));
-        backLeft->setSpeed(abs(leftSpeed));
-        frontLeft->run((leftSpeed >= 0) ? FORWARD : BACKWARD);
-        backLeft->run((leftSpeed >= 0) ? FORWARD : BACKWARD);
-
-        frontRight->setSpeed(abs(rightSpeed));
-        backRight->setSpeed(abs(rightSpeed));
-        frontRight->run((rightSpeed >= 0) ? FORWARD : BACKWARD);
-        backRight->run((rightSpeed >= 0) ? FORWARD : BACKWARD);
+        setSpeedAndDirection(frontLeft, leftSpeed);
+        setSpeedAndDirection(backLeft, leftSpeed);
+        setSpeedAndDirection(frontRight, rightSpeed);
+        setSpeedAndDirection(backRight, rightSpeed);
     }
 
     void moveForward() {
@@ -74,18 +70,18 @@ public:
 
     void turnRight90() {
         Serial.println("Turning Right 90 Degrees");
-        frontLeft->run(FORWARD);
-        frontRight->run(RELEASE);
-        backLeft->run(FORWARD);
-        backRight->run(RELEASE);
+        setSpeedAndDirection(frontLeft, speed, FORWARD);
+        setSpeedAndDirection(frontRight, speed, RELEASE);
+        setSpeedAndDirection(backLeft, speed, FORWARD);
+        setSpeedAndDirection(backRight, speed, RELEASE);
     }
 
     void turnLeft90() {
         Serial.println("Turning Left 90 Degrees");
-        frontLeft->run(RELEASE);
-        frontRight->run(FORWARD);
-        backLeft->run(RELEASE);
-        backRight->run(FORWARD);
+        setSpeedAndDirection(frontLeft, speed, RELEASE);
+        setSpeedAndDirection(frontRight, speed, FORWARD);
+        setSpeedAndDirection(backLeft, speed, RELEASE);
+        setSpeedAndDirection(backRight, speed, FORWARD);
     }
 
     void performUTurn() {
@@ -98,33 +94,39 @@ public:
 
     void stopAllMotors() {
         Serial.println("Stopping All Motors");
-        frontLeft->run(RELEASE);
-        frontRight->run(RELEASE);
-        backLeft->run(RELEASE);
-        backRight->run(RELEASE);
+        runAllMotors(RELEASE, RELEASE, RELEASE, RELEASE);
     }
 
     void searchForPuck() {
-    setMotorSpeeds(110, -110);
-    delay(200);
-    setMotorSpeeds(0,0);
-    delay(300);
+        setMotorSpeeds(0, 0);
+        delay(100);
+        setMotorSpeeds(160, -160);
+        delay(200);
+        setMotorSpeeds(0, 0);
     }
 
 private:
     Adafruit_MotorShield motorShield;
     Adafruit_DCMotor *frontRight, *frontLeft, *backRight, *backLeft;
-    int speed, rotateSpeed;
+    int speed;
 
-    void runAllMotors(uint8_t directionFR, uint8_t directionFL, uint8_t directionBR, uint8_t directionBL) {
+    void updateMotorSpeeds() {
         frontLeft->setSpeed(speed);
         frontRight->setSpeed(speed);
         backLeft->setSpeed(speed);
         backRight->setSpeed(speed);
-        frontLeft->run(directionFL);
-        frontRight->run(directionFR);
-        backLeft->run(directionBL);
-        backRight->run(directionBR);
+    }
+
+    void setSpeedAndDirection(Adafruit_DCMotor *motor, int speed, uint8_t direction = FORWARD) {
+        motor->setSpeed(abs(speed));
+        motor->run(direction);
+    }
+
+    void runAllMotors(uint8_t directionFR, uint8_t directionFL, uint8_t directionBR, uint8_t directionBL) {
+        setSpeedAndDirection(frontLeft, speed, directionFL);
+        setSpeedAndDirection(frontRight, speed, directionFR);
+        setSpeedAndDirection(backLeft, speed, directionBL);
+        setSpeedAndDirection(backRight, speed, directionBR);
     }
 };
 
