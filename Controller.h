@@ -68,17 +68,31 @@ public:
 }
     // Distance to Goal
     float distanceToGoal() {
-    // Sanity checsks
-    if (robotData.posX == -1) {
+    // Sanity checks
+    if (robotData.posX == NULL) {
         return -1; // posX is not set or invalid
     }
-    if (robotData.posY == -1) {
+    if (robotData.posY == NULL) {
         return -2; // posY is not set or invalid
     }
     // Euclidean Norm
     targetToGoal = sqrt(pow(goal_x - robotData.posX, 2) + pow(goal_y - robotData.posY, 2));
     return targetToGoal;
 }
+  float robotX() {
+    if (robotData.posX == NULL) {
+        return -1; // posX is not set or invalid
+    }
+    return robotData.posX;
+  }
+
+  float robotY() {
+    if (robotData.posY == NULL) {
+        return -1; // posY is not set or invalid
+    }
+    return robotData.posY;
+  }
+
 
    float initialYawOffset; 
     void performTurnBasedOnFlag() {

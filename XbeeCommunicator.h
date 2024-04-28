@@ -35,6 +35,7 @@ public:
     void handleXbeeComm() {
         // Send and receive data
         sendQuery(); // SEND the query to the Zigbee
+        delay(80); //100ms works, let's shorten this
         receiveData(); // RECEIVE the data from the Zigbee, if there is something to receive
     }
 
