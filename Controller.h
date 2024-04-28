@@ -184,11 +184,16 @@ double calculatePID(double error, double kp, double ki, double kd) {
         return angle;
     }
 
+    float normalizeAnglePI(float angle) {
+      if (angle > 180) angle = angle - 360;
+      return angle;
+    }
+
     // Reads the current heading in degrees from the BNO055
     float readHeading() {
         sensors_event_t event;
         bno->getEvent(&event, Adafruit_BNO055::VECTOR_EULER);
-        float heading = event.orientation.z; // Reading heading in degrees from 0 to 360
+        float heading = event.orientation.x; // Reading heading in degrees from 0 to 360
         return heading;
     }
 
