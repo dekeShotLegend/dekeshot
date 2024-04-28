@@ -1,8 +1,3 @@
-/**
-* Developer: Seyi R. Afolayan
-* Work: Main Controller Logic 
-**/
-/********************************************************BEGIN CODE*****************************************************/
 // Include necessary library headers
 #include <Arduino.h>
 #include <Wire.h>
@@ -43,7 +38,7 @@ void setup() {
     Serial.begin(115200);
     setupIMU();
     pixy.init();
-    robot.initializeMotors(); // initialize the robot motors
+    robot.begin(); // initialize the robot motors
     controller.init();
     xbeeComms.setupXbeeComm();  // Setup XBee communication
 }
