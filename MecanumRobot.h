@@ -18,10 +18,10 @@ public:
     }
 
     void initializeMotors() {
-        frontRight = motorShield.getMotor(1);
-        frontLeft = motorShield.getMotor(2);
-        backRight = motorShield.getMotor(3);
-        backLeft = motorShield.getMotor(4);
+        frontLeft = motorShield.getMotor(1); // Motor 1 is the FRONT left motor
+        frontRight = motorShield.getMotor(2); // Motor 2 is the FRONT right motor
+        backLeft = motorShield.getMotor(3); // Motor 3 is the  REAR left motor
+        backRight = motorShield.getMotor(4); // Motor 4 is the REAR right motor 
     }
 
     void setAllMotorSpeeds(int newSpeed) {
