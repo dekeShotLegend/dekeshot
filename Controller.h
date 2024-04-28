@@ -70,7 +70,7 @@ private:
     unsigned int refreshRate;
     volatile double integral{0}, previous_error{0};
 
-    void Controller::updatePixy() {
+    void updatePixy() {
     int blockCount = pixy->ccc.getBlocks();
     if (blockCount > 0) {
         // Process all blocks to find the one with PUCK_SIGNATURE
@@ -99,7 +99,7 @@ private:
     }
 }
 
-    void Controller::driveTowardsPuck() {
+    void driveTowardsPuck() {
     int cameraCenterX = 160; // Pixy stuff is 319 so I am using 320 here
     int errorX = puck.x - cameraCenterX;  // Calculate error from the center
     int proportionalSpeedAdjustment = kp_turn * errorX;  // Calculate proportional speed adjustment
