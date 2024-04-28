@@ -31,15 +31,16 @@ public:
     Controller(Pixy2 *pixy, int pinPing, Adafruit_BNO055 *bno, MecanumRobot *robot)
         : pixy(pixy), PIN_PING(pinPing), robot(robot), bno(bno) {
         // Initialize PID constants
-        kp_turn = 0.2;
-        ki_turn = 0.1;
+        kp_turn = 1.15;
+        ki_turn = 0.07;
         kd_turn = 0.05;
-        kp_forward = 0.4;
+        kp_forward = 0.3;
         ki_forward = 0.1;
         kd_forward = 0.01;
         refreshRate = 50; // PID refresh rate in milliseconds
     }
     float goal_x{25.0}, goal_y{60.0};
+    bool straightToGoal{false};
     void init() {
         if (!bno->begin()) {
             Serial.println("No BNO055 detected. Check your wiring.");
@@ -50,7 +51,15 @@ public:
         robot->setAllMotorSpeeds(0); // Default speed for all motors
         readInitialRollOffset();
     }
-
+    float distanceToGoal () {
+      if(robotData.posX == NULL) {
+        return -1;
+      }
+      if(robotData.posY == NULL) {
+        return -2;
+      }
+      return sqrt(pow(goal_x - robotData.posX,2) + pow(goal_y - robotData.posY,2));
+    }
     void Controller::run(float heading) {
         updatePING();
         updatePixy();
@@ -76,7 +85,7 @@ private:
         int index = -1;
         for (int i = 0; i < blockCount; ++i) {
             if (pixy->ccc.blocks[i].m_signature == PUCK_SIGNATURE) {
-                if (index == -1 || pixy->ccc.blocks[i].m_width * pixy->ccc.blocks[i].m_height > puck.width * puck.height) {
+                if (index == -1 || pixy->ccc.blocks[i].m_width * pixy->ccc.blocks[i].m_height > 20) {
                     index = i;
                 }
             }
@@ -104,14 +113,15 @@ private:
     void driveTowardsPuck() {
     int cameraCenterX = 160; // Pixy stuff is 319 so I am using 320 here
     int errorX = puck.x - cameraCenterX;  // Calculate error from the center
-    int proportionalSpeedAdjustment = kp_turn * errorX;  // Calculate proportional speed adjustment
+    int proportionalSpeedAdjustment = kp_turn * errorX / 5.0;  // Calculate proportional speed adjustment
+    Serial.print(proportionalSpeedAdjustment); Serial.println(" Proportional Speed Adjustment.");
 
 
     // Dynamically adjust speed as the puck approaches the center
-    if (abs(errorX) < 40) {  // '10' can be adjusted based on what is considered 'centered'
+    if (abs(errorX) < 20) {  // '10' can be adjusted based on what is considered 'centered'
         robot->setMotorSpeeds(0, 0);  // Stop the robot or adjust to a very slow movement
         delay(100);
-        robot->setMotorSpeeds(100, 100); // This could be modified to only trigger under certain conditions
+        robot->setAllMotorSpeeds((frontDis * 2 + 15> 100 ? 100 : frontDis * 2 + 15)); // Chandler: This has to either be continuous or slow down quicker
         delay(300);
         robot->setMotorSpeeds(0, 0);  // Stop the robot or adjust to a very slow movement
     } else {
@@ -120,16 +130,17 @@ private:
     int leftMotorSpeed = baseSpeed + proportionalSpeedAdjustment;
     int rightMotorSpeed = baseSpeed - proportionalSpeedAdjustment;
     robot->setMotorSpeeds(leftMotorSpeed, rightMotorSpeed);
+    delay(200);
     }
 }
 
   float getGoalAngle(){
     float horizontal = (robotData.posX - goal_x);
     float vertical = (robotData.posY - goal_y);
-    float angle = (atan2(vertical,horizontal)+M_PI)*180/(M_PI);
+    float angle = atan2(vertical,horizontal)*180/(M_PI); //Chandler: This is probably wrong; IMU goes from -180 to 180, I thought 0 to 360 at firs
+    //Chandler: use ReadRoll function here
     return angle;
   }
-
     void updatePING() {
         pinMode(PIN_PING, OUTPUT);
         digitalWrite(PIN_PING, LOW);
@@ -145,9 +156,19 @@ private:
     }
 
     void processMovements(float heading) {
-        if (frontDis <= 10) {
-            robot->setChaseStatus(false);
-            turn(getGoalAngle() - heading,kp_turn,ki_turn,kd_turn);
+        if (frontDis > 2 && frontDis < 7) {
+            Serial.println("Acquired Pixy .....");
+            robot->setAllMotorSpeeds(0);
+            delay(10000);
+            /*if (robot->trackingPuck) {
+              robot->setChaseStatus(false);
+              turn(getGoalAngle() - heading,kp_turn,ki_turn,kd_turn); //Chandler: This is where I tried to implement a turn
+              straightToGoal = true;
+            }
+            else {
+              robot->setMotorSpeeds(-100, -100);
+              delay(300);
+            }*/
         } else if (frontDis > 30) {
            robot->setChaseStatus(false);
         }
@@ -178,8 +199,13 @@ private:
 
     void turn(double degrees, double kp, double ki, double kd) {
         double target = rollOffset + degrees;
+        target = (target < -180 ? target + 360 : target); //Chandler: yeah I messed up the turns
         double currentRoll;
         do {
+            Serial.print("Target: ");
+            Serial.println(target);
+            Serial.print("currentRoll: ");
+            Serial.println(currentRoll);
             readRoll(currentRoll);
             double output = calculatePID(target - currentRoll, kp, ki, kd);
             robot->setMotorSpeeds(output, -output);
@@ -207,7 +233,7 @@ private:
         sensors_event_t event;
         bno->getEvent(&event, Adafruit_BNO055::VECTOR_EULER);
         val = event.orientation.x;
-        if (val >= 180) val -= 360;
+        //if (val >= 180) val -= 360; Chandler: if maping from -pi to pi, this isn't necessary
     }
 };
 

@@ -105,11 +105,10 @@ public:
     }
 
     void searchForPuck() {
-    setMotorSpeeds(0, 0);
-    delay(100);
-    setMotorSpeeds(160, -160);
+    setMotorSpeeds(110, -110);
     delay(200);
-    setMotorSpeeds(0, 0);
+    setMotorSpeeds(0,0);
+    delay(300);
     }
 
 private:

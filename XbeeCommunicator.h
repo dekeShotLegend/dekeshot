@@ -34,8 +34,10 @@ public:
     // Handle the communication in the main loop
     void handleXbeeComm() {
         // Send and receive data
+        Serial.println("Start handling");
         sendQuery(); // SEND the query to the Zigbee
         receiveData(); // RECEIVE the data from the Zigbee, if there is something to receive
+        Serial.println("End handling");
     }
 
     // Send query to the XBee module
@@ -47,23 +49,14 @@ public:
         }
     }
 
-    // Receive data from XBee module, try 100 times in one second,
+    // Receive data from XBee module, try 10 times in one second,
     // if data isn't recieved then, warn user in Serial Monitor
-    void receiveData(int tries = 0) {
-        int lastChance = 100;
-        if (tries < lastChance) {
-          Serial.println("Timeout - nothing recieved after one second");
-          return;
-        }
-        if (xbeeSerial.available()) {
+    void receiveData() { //Chandler: I really don't think this is right - the behavior with this is three motor bursts at startup, then two repeatedly
+        if(xbeeSerial.available()) {
             String incomingXbeeData = xbeeSerial.readStringUntil('\n');
             incomingXbeeData.trim(); // Trim the whitespace
             if (incomingXbeeData.length() > 0)
                 parseIncomingData(incomingXbeeData);
-        }
-        else {
-          delay(10);
-          receiveData(tries++);
         }
     }
 

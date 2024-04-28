@@ -48,14 +48,20 @@ void setup() {
 void loop() {
     sensors_event_t event; 
     bno.getEvent(&event);
-    controller.run(event.orientation.x);
+    controller.run(event.orientation.x); //Chandler: this is stupid, just refer to ReadRoll in Controller
+    Serial.println("I get here");
     xbeeComms.handleXbeeComm();  // Handle XBee communication in the main loop
-    if (robotData.matchStatus == "START") {
-      //robot.setAllMotorSpeeds(50);
-    } else if (robotData.matchStatus == "STOP") {
-      //robot.stopAllMotors();
+    Serial.println(controller.straightToGoal); 
+    Serial.println(controller.distanceToGoal());
+    //Chandler: this is just charging forward once the puck is captured
+    while (controller.straightToGoal && controller.distanceToGoal() > 10) {
+      xbeeComms.handleXbeeComm();
     }
-
+    if (controller.straightToGoal) {
+    robot.setAllMotorSpeeds(0);
+    delay(1000);
+    controller.straightToGoal = false;
+    }
     // I will implement this later
     // navigateToPosition(robotData.posX, robotData.posY);
 
