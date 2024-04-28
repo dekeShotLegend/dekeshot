@@ -6,15 +6,13 @@
 #include <utility/imumaths.h>
 #include <Pixy2.h>
 #include "Controller.h"
-#include "MecanumRobot.h"
 
 // Initialize sensor and controller objects
 Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
 Pixy2 pixy; 
 MecanumRobot robot;  // Proper instantiation of MecanumRobot
 
-const int PIN_PING{49}; // Ping sensor 
-const int PIN_RELAY{44};
+const int PIN_PING{13}; // Ping sensor 
 
 // Instantiate the Controller and XbeeCommunicator
 Controller controller(&pixy, PIN_PING, &bno, &robot);  // Pass the robot object to the controller
@@ -35,20 +33,17 @@ void setupIMU(){
 }
 
 void setup() {
-    pinMode(PIN_RELAY,OUTPUT);
-    digitalWrite(PIN_RELAY, LOW);
     Serial.begin(115200);
     setupIMU();
     pixy.init();
-    xbeeComms.setupXbeeComm();  // Setup XBee communication
     robot.begin(); // initialize the robot motors
     controller.init();
+    xbeeComms.setupXbeeComm();  // Setup XBee communication
 }
 
 void loop() {
-    sensors_event_t event; 
-    bno.getEvent(&event);
-    controller.run(event.orientation.x); //Chandler: this is stupid, just refer to ReadRoll in Controller
+    float currentHeading = controller.readHeading();
+    controller.run(currentHeading);
     Serial.println("I get here");
     xbeeComms.handleXbeeComm();  // Handle XBee communication in the main loop
     Serial.println(controller.straightToGoal); 
