@@ -24,7 +24,8 @@ Puck puck;
 
 #define PUCK_SIGNATURE 7 // Change this if you calibrated the Pixy using another signature.
 // Addition initializaitons 
-float goal_x{25.0}, goal_y{60.0}; // We got this from Marvin Gao (ASBR guy)
+float goal_x_far{225.0}, goal_y{60.0},goal_x_near; // We got this from Marvin Gao (ASBR guy)
+bool goal_switch{false};
 double targetToGoal{0.0}; // This is for when we seize the puck and we are trying to drive it towards goal.
 
 
@@ -58,12 +59,13 @@ public:
     bool actionInProgress = false;
     bool straightToGoal = false;
 
+    float frontDis;
+
     // Goal angle 
     float getGoalAngle() {
-    float horizontal = (robotData.posX - goal_x);
+    float horizontal = (robotData.posX - (goal_switch ? goal_x_far : goal_x_near));
     float vertical = (robotData.posY - goal_y);
-    float angle = atan2(vertical, horizontal) * 180 / M_PI;  
-    angle = normalizeAngle(angle); 
+    float angle = 180 + atan2(vertical, horizontal) * 180 / M_PI; //0 to 360
     return angle;
 }
     // Distance to Goal
@@ -76,6 +78,7 @@ public:
         return -2; // posY is not set or invalid
     }
     // Euclidean Norm
+    float goal_x = goal_switch ? goal_x_far : goal_x_near;
     targetToGoal = sqrt(pow(goal_x - robotData.posX, 2) + pow(goal_y - robotData.posY, 2));
     return targetToGoal;
 }
@@ -92,19 +95,9 @@ public:
     }
     return robotData.posY;
   }
-
-
    float initialYawOffset; 
-    void performTurnBasedOnFlag() {
-    switch (turnFlag) {
-        case 1: turn(-90, kp_turn, ki_turn, kd_turn); break;  // Turn left 90 degrees
-        case 2: turn(90, kp_turn, ki_turn, kd_turn); break;   // Turn right 90 degrees
-    }
 }
 
-void performEmergencyManeuver() {
-    turn(180, kp_turn, ki_turn, kd_turn); // Execute a 180-degree turn
-}
 
     // Adjusts the robot's speed for safety purposes
     void adjustSpeedForSafety() {
@@ -113,7 +106,7 @@ void performEmergencyManeuver() {
 
     // Executes a turn by a specified number of degrees using PID control
 void turn(double degrees, double kp, double ki, double kd) {
-    double targetYaw = fmod(readHeading() + degrees, 360.0);
+    double targetYaw = degrees;
     double currentYaw = readHeading();
     double output, error;
 
@@ -131,6 +124,36 @@ void turn(double degrees, double kp, double ki, double kd) {
         // Calculate the PID output based on the error
         output = calculatePID(error, kp, ki, kd);
         robot->setMotorSpeeds(output, -output); // Apply the output to motor speeds
+
+        Serial.print("Target Yaw: ");
+        Serial.println(targetYaw);
+        Serial.print("Current Yaw: ");
+        Serial.println(currentYaw);
+        delay(10); 
+
+    } while (!isTurnComplete(targetYaw, currentYaw)); // Continue until the turn is complete
+}
+
+//left side: true, right side: false. Inspired by the video shown to us by TAs.
+void turnOneSide(double degrees, double kp, double ki, double kd, bool side) {
+    double targetYaw = degrees;
+    double currentYaw = readHeading();
+    double output, error;
+
+    do {
+        currentYaw = readHeading();
+        error = targetYaw - currentYaw;
+
+        // It is important to normalize the error here folks from -180 to 180 as per ASBR. 
+        if (error > 180) {
+            error -= 360; 
+        } else if (error < -180) {
+            error += 360;
+        }
+
+        // Calculate the PID output based on the error
+        output = calculatePID(error, kp, ki, kd);
+        robot->setMotorSpeeds(output*side, output*!side); // Apply the output to motor speeds
 
         Serial.print("Target Yaw: ");
         Serial.println(targetYaw);
@@ -171,10 +194,10 @@ double calculatePID(double error, double kp, double ki, double kd) {
         robot->setAllMotorSpeeds(0); 
     }
 
-    void run(float heading) {
+    void run() {
         updatePING();
         updatePixy();
-        processMovements(heading);
+        processMovements();
     }
 
     // Normalizes any angle to the range of 0 to 360 degrees
@@ -190,13 +213,22 @@ double calculatePID(double error, double kp, double ki, double kd) {
     }
 
     // Reads the current heading in degrees from the BNO055
-    float readHeading() {
+    double readHeading() {
         sensors_event_t event;
         bno->getEvent(&event, Adafruit_BNO055::VECTOR_EULER);
         float heading = event.orientation.x; // Reading heading in degrees from 0 to 360
-        return heading;
+        return (360 - heading); //coordinate plane is flipped between ZigBee field and IMU, I'm picking to flip this, robot must face pink goal on initialization
     }
-
+    void updatePING() {
+        pinMode(PIN_PING, OUTPUT);
+        digitalWrite(PIN_PING, LOW);
+        delayMicroseconds(2);
+        digitalWrite(PIN_PING, HIGH);
+        delayMicroseconds(5);
+        digitalWrite(PIN_PING, LOW);
+        pinMode(PIN_PING, INPUT);
+        frontDis = (pulseIn(PIN_PING, HIGH) / 2) * 0.0343; 
+    }
 
 private:
     Pixy2* pixy;
@@ -204,7 +236,6 @@ private:
     Adafruit_BNO055* bno;
     int PIN_PING;
     double kp_turn, ki_turn, kd_turn, kp_forward, ki_forward, kd_forward;
-    float frontDis;
     unsigned int refreshRate;
 
     void updatePixy() {
@@ -249,20 +280,10 @@ private:
     }
 }
 
-    void updatePING() {
-        pinMode(PIN_PING, OUTPUT);
-        digitalWrite(PIN_PING, LOW);
-        delayMicroseconds(2);
-        digitalWrite(PIN_PING, HIGH);
-        delayMicroseconds(5);
-        digitalWrite(PIN_PING, LOW);
-        pinMode(PIN_PING, INPUT);
-        frontDis = (pulseIn(PIN_PING, HIGH) / 2) * 0.0343; 
-    }
 
-    void processMovements(float heading) {
+    void processMovements() {
         // Check distance to puck and adjust behavior
-        if (frontDis > 2 && frontDis < 7) {
+        if (frontDis > 2 && frontDis < 10) {
             if (!actionInProgress) {
                 Serial.println("Acquired Pixy ..... Positioning.");
                 robot->setAllMotorSpeeds(0);
@@ -275,7 +296,7 @@ private:
                 actionInProgress = false; // Reset the action flag
                 if (robot->trackingPuck) {
                     robot->setChaseStatus(false);
-                    float angleDifference = getGoalAngle() - heading;
+                    float angleDifference = getGoalAngle() - readHeading();
                     turn(angleDifference, kp_turn, ki_turn, kd_turn);
                     straightToGoal = true;
                 } else {

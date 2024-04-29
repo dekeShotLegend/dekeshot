@@ -12,7 +12,8 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
 Pixy2 pixy; 
 MecanumRobot robot;  // Proper instantiation of MecanumRobot
 
-const int PIN_PING{13}; // Ping sensor 
+const int PIN_PING{13}; // Ping sensor
+const int PIN_RELAY{20}; // Ping sensor  
 
 // Instantiate the Controller and XbeeCommunicator
 Controller controller(&pixy, PIN_PING, &bno, &robot);  // Pass the robot object to the controller
@@ -33,28 +34,35 @@ void setupIMU(){
 }
 
 void setup() {
+    pinMode(PIN_RELAY,OUTPUT);
+    digitalWrite(PIN_RELAY,LOW);
     Serial.begin(115200);
     setupIMU();
     pixy.init();
     robot.begin(); // initialize the robot motors
     controller.init();
     xbeeComms.setupXbeeComm();  // Setup XBee communication
+    xbeeComms.handleXbeeComm(); // single check, don't run code until game starts
+    while(robotData.matchStatus != "1") {
+      xbeeComms.handleXbeeComm();
+    }
+    Serial.println(robotData.matchStatus);
 }
 
 void loop() {
     float currentHeading = controller.readHeading();
-    controller.run(currentHeading);
+    controller.run();
     Serial.println("I get here");
     xbeeComms.handleXbeeComm();  // Handle XBee communication in the main loop
-    Serial.println(controller.straightToGoal); 
-    Serial.println(controller.distanceToGoal());
     //Chandler: this is just charging forward once the puck is captured
-    while (controller.straightToGoal && controller.distanceToGoal() > 10) {
+    while (controller.straightToGoal && controller.distanceToGoal() > 80) { //experimentally 10 is too close
       xbeeComms.handleXbeeComm();
     }
     if (controller.straightToGoal) {
     robot.setAllMotorSpeeds(0);
-    delay(1000);
+    digitalWrite(PIN_RELAY,HIGH);
+    delay(500);
+    digitalWrite(PIN_RELAY,LOW);
     controller.straightToGoal = false;
     }
     // I will implement this later
@@ -62,3 +70,4 @@ void loop() {
 
     // Other Codes 
 }
+

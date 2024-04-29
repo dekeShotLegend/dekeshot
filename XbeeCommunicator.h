@@ -35,26 +35,26 @@ public:
     void handleXbeeComm() {
         // Send and receive data
         sendQuery(); // SEND the query to the Zigbee
-        delay(80); //100ms works, let's shorten this
         receiveData(); // RECEIVE the data from the Zigbee, if there is something to receive
     }
 
     // Send query to the XBee module
     void sendQuery() {
-        static size_t prevQueryTime{millis()};
-        if ((millis() - prevQueryTime) > 1000) {
-            xbeeSerial.print('?');
-            prevQueryTime = millis(); // Reset the time for the next query
-        }
+        xbeeSerial.print('?');
     }
 
     // Receive data from XBee module
     void receiveData() {
+        unsigned long startMillis = millis();
+        while (!xbeeSerial.available() && (millis() - startMillis) < 1000);
         if (xbeeSerial.available()) {
             String incomingXbeeData = xbeeSerial.readStringUntil('\n');
             incomingXbeeData.trim(); // Trim the whitespace
             if (incomingXbeeData.length() > 0)
                 parseIncomingData(incomingXbeeData);
+        }
+        else{
+          Serial.println("no data found");
         }
     }
 
