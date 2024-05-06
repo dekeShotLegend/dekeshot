@@ -8,8 +8,8 @@
 // Structure for holding our data
 #include <Arduino.h>
 struct RobotData {
-    String matchStatus;
-    String matchTime;
+    int matchStatus;
+    int matchTime;
     float posX;
     float posY;
 };
@@ -45,8 +45,6 @@ public:
 
     // Receive data from XBee module
     void receiveData() {
-        unsigned long startMillis = millis();
-        while (!xbeeSerial.available() && (millis() - startMillis) < 1000);
         if (xbeeSerial.available()) {
             String incomingXbeeData = xbeeSerial.readStringUntil('\n');
             incomingXbeeData.trim(); // Trim the whitespace
@@ -74,8 +72,8 @@ public:
         int indexSecondComma = data.indexOf(',', indexFirstComma + 1);
         int indexThirdComma = data.indexOf(',', indexSecondComma + 1);
 
-        robotData.matchStatus = data.substring(0, indexFirstComma);
-        robotData.matchTime = data.substring(indexFirstComma + 1, indexSecondComma);
+        robotData.matchStatus = data.substring(0, indexFirstComma).toInt();
+        robotData.matchTime = data.substring(indexFirstComma + 1, indexSecondComma).toInt();
         String posXstr = data.substring(indexSecondComma + 1, indexThirdComma);
         String posYstr = data.substring(indexThirdComma + 1);
 
@@ -83,19 +81,19 @@ public:
             Serial.println("Jhu Hockey Robot Location is not available.");
             return;
         }
-
         robotData.posX = posXstr.toFloat(); 
         robotData.posY = posYstr.toFloat();
-
-        // Log data to serial monitor
-        Serial.print("Match Status: "); Serial.println(robotData.matchStatus == "1" ? "Ongoing" : "Not Active");
-        Serial.print("Match Time: "); Serial.println(robotData.matchTime);
-        Serial.print("Position X: "); Serial.println(robotData.posX);
-        Serial.print("Position Y: "); Serial.println(robotData.posY);
+        Serial.println(robotData.matchStatus);
+        Serial.println(robotData.matchTime);
+        Serial.println(robotData.posX);
+        Serial.println(robotData.posY);
     }
 
     void updateRobotPosition(float x, float y){
       x = robotData.posX; 
       y = robotData.posY;
+    }
+    int available() {
+      return xbeeSerial.available();
     }
 };
